@@ -4,9 +4,12 @@ Proof of concept: *Can a conditional diffusion-assisted 3D segmentation framewor
 improve lung-tumor segmentation, especially for small, irregular, low-contrast tumors?*
 
 ## Pipeline
+
 NIfTI -> MONAI -> tumor-aware patch sampler -> 3D U-Net -> (optional) diffusion refiner -> metrics
 
+
 ## Experiments
+
 | ID | Description |
 |----|-------------|
 | E0 | 3D U-Net (Dice + BCE) |
@@ -25,4 +28,5 @@ make baseline
 make diffusion
 make eval
 ```
+
 
