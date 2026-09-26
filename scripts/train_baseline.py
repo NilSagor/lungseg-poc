@@ -16,8 +16,11 @@ from lungseg.models import BaselineUNet
 
 
 def set_seed(seed):
-    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed); set_determinism(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    set_determinism(seed)
 
 
 def build_loss(cfg, use_boundary):
