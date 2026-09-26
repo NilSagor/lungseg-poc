@@ -1,8 +1,6 @@
 import pytest
 import torch
 
-
-
 @pytest.fixture
 def sample_batch():
     image = torch.randn(2, 1, 32, 32, 32)
