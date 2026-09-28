@@ -1,6 +1,9 @@
 """Train the 3D U-Net baseline (E0 / E1)."""
-import argparse, json, random
+import argparse
+import json
+import random
 from pathlib import Path
+
 import numpy as np
 import torch
 import yaml

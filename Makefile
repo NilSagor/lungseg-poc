@@ -27,6 +27,8 @@ eval:
 experiments:
 	bash scripts/run_experiments.sh
 
+benchmark-sampling:
+	python scripts/benchmark_sampling.py --config configs/poc.yaml
 
 clean:
 	rm -rf outputs checkpoints .pytest_cache .ruff_cache

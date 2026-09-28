@@ -1,8 +1,8 @@
 """3D U-Net baseline and conditional diffusion refiner."""
 
 import torch
-import torch.nn as nn
 from monai.networks.nets import UNet
+from torch import nn
 
 
 class BaselineUNet(nn.Module):

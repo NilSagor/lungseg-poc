@@ -1,7 +1,6 @@
 """Metric collection for tumor segmentation."""
 import torch
-
-from monai.metrics import DiceMetric, HausdorffDistanceMetric, MeanIoU 
+from monai.metrics import DiceMetric, HausdorffDistanceMetric, MeanIoU
 
 
 class SegmentationMetrics:
@@ -26,7 +25,7 @@ class SegmentationMetrics:
                "iou": float(self.iou.aggregate().item())}
         try:
             out["hd95"] = float(self.hd95.aggregate().item())
-        except Exception:
+        except (RuntimeError, ValueError, AttributeError):
             out["hd95"] = float("nan")
         return out
 
