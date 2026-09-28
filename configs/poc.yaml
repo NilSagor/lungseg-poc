@@ -35,3 +35,5 @@ evaluation:
   threshold: 0.5
   sw_batch_size: 2
   overlap: 0.25
+  diffusion_sampler: patch    # "full" | "patch"
+  blend: gaussian             # "gaussian" | "constant"

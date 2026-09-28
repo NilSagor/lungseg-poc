@@ -1,17 +1,20 @@
 """Evaluate a saved baseline / refiner checkpoint on the validation split."""
-import argparse, json
+import argparse
+import json
 from pathlib import Path
+
 import torch
+import torch.nn.functional as F
 import yaml
 from monai.inferers import sliding_window_inference
 from tqdm import tqdm
 
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
+from lungseg.inference import patch_diffusion_sample
 from lungseg.metrics import SegmentationMetrics
 from lungseg.models import BaselineUNet, DiffusionRefiner
 
-import torch.nn.functional as F
 
 def pad_to_multiple(tensor: torch.Tensor, multiple: int = 16) -> torch.Tensor:
     """Pads the spatial dimensions of a tensor to be divisible by `multiple`."""
@@ -80,12 +83,30 @@ def main():
             padded_image = pad_to_multiple(image, pad_multiple)
             padded_logits = pad_to_multiple(logits, pad_multiple)
 
-            refined_logits = schedule.sample(
-                refiner=refiner, 
-                image=padded_image,
-                initial_logits=padded_logits,
-                inference_steps=cfg["diffusion"]["inference_steps"]
-            )
+            mode = cfg["evaluation"].get("diffusion_sampler", "full")
+
+            if mode == "patch":
+                logits = patch_diffusion_sample(
+                    schedule=schedule,
+                    refiner=refiner,
+                    image=image,
+                    initial_logits=logits,
+                    roi_size=tuple(cfg["data"]["patch_size"]),
+                    overlap=cfg["evaluation"]["overlap"],
+                    inference_steps=cfg["diffusion"]["inference_steps"],
+                    blend=cfg["evaluation"].get("blend", "gaussian"),
+                    seed=cfg["seed"],
+                )
+            else:
+                refined_logits = schedule.sample(
+                                refiner=refiner, 
+                                image=padded_image,
+                                initial_logits=padded_logits,
+                                inference_steps=cfg["diffusion"]["inference_steps"]
+                            )
+
+            
+            
             
             logits = crop_to_original(refined_logits, image.shape)
             # logits = schedule.sample(refiner=refiner, image=image,

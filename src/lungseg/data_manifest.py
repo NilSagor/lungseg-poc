@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 
-
 def build_task06_manifest(data_root: str | Path) -> list[dict[str, str]]:
     data_root = Path(data_root)
     image_dir = data_root / "imagesTr"

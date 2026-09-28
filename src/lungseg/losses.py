@@ -1,9 +1,8 @@
 """Segmentation and boundary losses."""
 
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from monai.losses import DiceLoss
+from torch import nn
 
 
 class BCEDiceLoss(nn.Module):

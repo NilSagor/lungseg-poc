@@ -1,5 +1,6 @@
 """Discover MSD Task06 Lung cases and write a patient-level split."""
 import argparse
+
 from lungseg.data import discover_cases, make_patient_split, save_split
 
 
