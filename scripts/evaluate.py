@@ -11,6 +11,29 @@ from lungseg.diffusion import DiffusionSchedule
 from lungseg.metrics import SegmentationMetrics
 from lungseg.models import BaselineUNet, DiffusionRefiner
 
+import torch.nn.functional as F
+
+def pad_to_multiple(tensor: torch.Tensor, multiple: int = 16) -> torch.Tensor:
+    """Pads the spatial dimensions of a tensor to be divisible by `multiple`."""
+    spatial_shape = tensor.shape[2:]
+    pad_sizes = []
+    # F.pad expects padding starting from the last dimension
+    for s in reversed(spatial_shape):
+        remainder = s % multiple
+        pad = (multiple - remainder) % multiple
+        pad_sizes.extend([0, pad])
+    
+    if sum(pad_sizes) > 0:
+        tensor = F.pad(tensor, pad_sizes, mode='constant', value=0)
+    return tensor
+
+def crop_to_original(tensor: torch.Tensor, original_shape: tuple) -> torch.Tensor:
+    """Crops the spatial dimensions of a tensor back to the original shape."""
+    slices = [slice(None), slice(None)]  # Keep batch and channel dimensions intact
+    for s in original_shape[2:]:
+        slices.append(slice(0, s))
+    return tensor[tuple(slices)]
+
 
 @torch.no_grad()
 def main():
@@ -42,15 +65,32 @@ def main():
 
     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
     roi = tuple(cfg["data"]["patch_size"])
+    pad_multiple = 16
     for batch in tqdm(val_loader, desc="eval"):
-        image = batch["image"].to(device); label = batch["label"].to(device)
-        logits = sliding_window_inference(inputs=image, roi_size=roi,
+        image = batch["image"].to(device) 
+        label = batch["label"].to(device)
+        logits = sliding_window_inference(
+            inputs=image, 
+            roi_size=roi,
             sw_batch_size=cfg["evaluation"]["sw_batch_size"],
-            predictor=baseline, overlap=cfg["evaluation"]["overlap"])
+            predictor=baseline, 
+            overlap=cfg["evaluation"]["overlap"]
+        )
         if refiner is not None:
-            logits = schedule.sample(refiner=refiner, image=image,
-                initial_logits=logits,
-                inference_steps=cfg["diffusion"]["inference_steps"])
+            padded_image = pad_to_multiple(image, pad_multiple)
+            padded_logits = pad_to_multiple(logits, pad_multiple)
+
+            refined_logits = schedule.sample(
+                refiner=refiner, 
+                image=padded_image,
+                initial_logits=padded_logits,
+                inference_steps=cfg["diffusion"]["inference_steps"]
+            )
+            
+            logits = crop_to_original(refined_logits, image.shape)
+            # logits = schedule.sample(refiner=refiner, image=image,
+            #     initial_logits=logits,
+            #     inference_steps=cfg["diffusion"]["inference_steps"])
         metrics.update(logits, label)
 
     result = metrics.aggregate()
