@@ -154,7 +154,7 @@ def main():
     optimizer = torch.optim.AdamW(refiner.parameters(),
         lr=cfg["training"]["learning_rate"],
         weight_decay=cfg["training"]["weight_decay"])
-    scaler = torch.cuda.amp.GradScaler(
+    scaler = torch.amp.GradScaler(
         enabled=cfg["training"]["amp"] and device.type == "cuda")
 
     out_dir = Path(a.out or f"outputs/diffusion{'_boundary' if a.use_boundary else ''}")
