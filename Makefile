@@ -24,5 +24,9 @@ eval:
 		--baseline-ckpt outputs/baseline/best.pt \
 		--out outputs/eval_baseline.json
 
+experiments:
+	bash scripts/run_experiments.sh
+
+
 clean:
 	rm -rf outputs checkpoints .pytest_cache .ruff_cache
