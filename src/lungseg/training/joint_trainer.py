@@ -42,8 +42,8 @@ class JointTrainer:
             weight_decay=t["weight_decay"],
         )
         amp = t["amp"] and device.type == "cuda"
-        self.scaler_b = torch.cuda.amp.GradScaler(enabled=amp)
-        self.scaler_r = torch.cuda.amp.GradScaler(enabled=amp)
+        self.scaler_b = torch.amp.GradScaler('cuda', enabled=amp)
+        self.scaler_r = torch.amp.GradScaler('cuda', enabled=amp)
         self.amp = amp
 
     # ------------------------------------------------------------------

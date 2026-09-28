@@ -1,18 +1,20 @@
 """Joint baseline + diffusion refiner training (Phase 8)."""
-import argparse, json
+import argparse
+import json
 from pathlib import Path
 
 import torch
 import yaml
+from monai.inferers import sliding_window_inference
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.metrics import SegmentationMetrics
 from lungseg.models import BaselineUNet, DiffusionRefiner
 from lungseg.training.joint_trainer import JointTrainer
-from monai.inferers import sliding_window_inference
-from tqdm import tqdm
+from lungseg.inference import patch_diffusion_sample
 
 
 def maybe_load(module, ckpt, device):
@@ -36,7 +38,7 @@ def validate(baseline, refiner, schedule, loader, cfg, device, use_patch):
             predictor=baseline, overlap=cfg["evaluation"]["overlap"],
         )
         if use_patch:
-            from lungseg.inference import patch_diffusion_sample
+            
             logits = patch_diffusion_sample(
                 schedule, refiner, image, logits,
                 roi_size=roi, overlap=cfg["evaluation"]["overlap"],

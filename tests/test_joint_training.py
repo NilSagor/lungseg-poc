@@ -1,4 +1,3 @@
-import torch
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.models import BaselineUNet, DiffusionRefiner
 from lungseg.training.joint_trainer import JointTrainer
