@@ -30,5 +30,17 @@ experiments:
 benchmark-sampling:
 	python scripts/benchmark_sampling.py --config configs/poc.yaml
 
+joint-warmup:
+	python scripts/train_joint.py --config configs/poc.yaml --mode warmup \
+		--baseline-ckpt outputs/e0_unet/best.pt --out outputs/joint_warmup
+
+joint-alt:
+	python scripts/train_joint.py --config configs/poc.yaml --mode alternating \
+		--baseline-ckpt outputs/e0_unet/best.pt --out outputs/joint_alt
+
+joint-e2e:
+	python scripts/train_joint.py --config configs/poc.yaml --mode end_to_end \
+		--baseline-ckpt outputs/e0_unet/best.pt --out outputs/joint_e2e
+
 clean:
 	rm -rf outputs checkpoints .pytest_cache .ruff_cache
