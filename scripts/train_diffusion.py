@@ -1,6 +1,8 @@
 """Train the conditional diffusion refiner (E2 / E3) with a frozen baseline."""
-import argparse, json
+import argparse
+import json
 from pathlib import Path
+
 import torch
 import torch.nn.functional as F
 import yaml
@@ -9,7 +11,6 @@ from tqdm import tqdm
 
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
-from lungseg.losses import BCEDiceLoss, BoundaryLoss
 from lungseg.metrics import SegmentationMetrics
 from lungseg.models import BaselineUNet, DiffusionRefiner
 

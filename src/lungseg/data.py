@@ -2,28 +2,34 @@
 
 import json
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 import torch
-from monai.data import Dataset, DataLoader, list_data_collate
+from monai.data import DataLoader, Dataset, list_data_collate
 from monai.transforms import (
-    Compose, EnsureChannelFirstd, EnsureTyped, LoadImaged, Orientationd,
-    RandCropByPosNegLabeld, RandFlipd, RandRotate90d, ScaleIntensityRanged, Spacingd,
+    Compose,
+    EnsureChannelFirstd,
+    EnsureTyped,
+    LoadImaged,
+    Orientationd,
+    RandCropByPosNegLabeld,
+    RandFlipd,
+    RandRotate90d,
+    ScaleIntensityRanged,
+    Spacingd,
 )
 
 
-def discover_cases(root: str | Path) -> List[Dict[str, str]]:
+def discover_cases(root: str | Path) -> list[dict[str, str]]:
     root = Path(root)
     images_dir, labels_dir = root / "imagesTr", root / "labelsTr"
     if not images_dir.is_dir() or not labels_dir.is_dir():
         raise FileNotFoundError(f"Expected imagesTr/ and labelsTr/ under {root}.")
 
-    cases: List[Dict[str, str]] = []
+    cases: list[dict[str, str]] = []
     for img_path in sorted(images_dir.glob("*.nii.gz")):
         stem = img_path.name.replace(".nii.gz", "")
-        if stem.endswith("_0000"):
-            stem = stem[:-5]
+        stem = stem.removesuffix("_0000")
         label_path = labels_dir / f"{stem}.nii.gz"
         if label_path.exists():
             cases.append({"image": str(img_path), "label": str(label_path)})
@@ -35,7 +41,7 @@ def discover_cases(root: str | Path) -> List[Dict[str, str]]:
 def make_patient_split(cases, val_fraction=0.2, seed=42):
     rng = np.random.default_rng(seed)
     idx = rng.permutation(len(cases))
-    n_val = max(1, int(round(len(cases) * val_fraction)))
+    n_val = max(1, round(len(cases) * val_fraction))
     val_idx = set(idx[:n_val].tolist())
     train = [c for i, c in enumerate(cases) if i not in val_idx]
     val = [c for i, c in enumerate(cases) if i in val_idx]
