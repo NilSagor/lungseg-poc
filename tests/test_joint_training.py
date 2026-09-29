@@ -1,3 +1,5 @@
+import math
+
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.models import BaselineUNet, DiffusionRefiner
 from lungseg.training.joint_trainer import JointTrainer
@@ -26,7 +28,7 @@ def test_warmup_step_runs(sample_batch):
     trainer = JointTrainer(baseline, refiner, sched, cfg, device)
     loader = [sample_batch]
     loss = trainer.train_one_epoch(loader, mode="warmup")
-    assert isinstance(loss, float) and loss == loss  # not NaN
+    assert isinstance(loss, float) and not math.isnan(loss)  # not NaN
 
 
 def test_alternating_step_runs(sample_batch):
@@ -37,7 +39,7 @@ def test_alternating_step_runs(sample_batch):
     sched = DiffusionSchedule(timesteps=4).to(device)
     trainer = JointTrainer(baseline, refiner, sched, cfg, device)
     loss = trainer.train_one_epoch([sample_batch], mode="alternating")
-    assert loss == loss
+    assert not math.isnan(loss)
 
 
 def test_end_to_end_step_runs(sample_batch):
@@ -48,4 +50,4 @@ def test_end_to_end_step_runs(sample_batch):
     sched = DiffusionSchedule(timesteps=4).to(device)
     trainer = JointTrainer(baseline, refiner, sched, cfg, device)
     loss = trainer.train_one_epoch([sample_batch], mode="end_to_end")
-    assert loss == loss
+    assert not math.isnan(loss)
