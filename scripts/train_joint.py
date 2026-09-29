@@ -11,10 +11,10 @@ from tqdm import tqdm
 
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
+from lungseg.inference import patch_diffusion_sample
 from lungseg.metrics import SegmentationMetrics
 from lungseg.models import BaselineUNet, DiffusionRefiner
 from lungseg.training.joint_trainer import JointTrainer
-from lungseg.inference import patch_diffusion_sample
 
 
 def maybe_load(module, ckpt, device):
