@@ -138,9 +138,13 @@ def main():
     p.add_argument("--baseline-ckpt", required=True)
     p.add_argument("--use-boundary", action="store_true")
     p.add_argument("--out", default=None)
+    p.add_argument("--seed-override", type=int, default=42)
     a = p.parse_args()
 
     cfg = yaml.safe_load(Path(a.config).read_text())
+    if a.seed_override is not None:
+        cfg["seed"] = a.seed_override
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_loader, val_loader = build_dataloaders(cfg, cfg["data"]["split_file"])
     baseline = load_baseline(cfg, device, a.baseline_ckpt)
