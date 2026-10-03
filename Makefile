@@ -51,6 +51,8 @@ uncertainty:
 		--refiner-ckpt outputs/e2_diffusion_seed0/last.pt \
 		--out outputs/e2_diffusion_seed0_uncertainty
 
+aggregate-multiseed:
+	python scripts/aggregate_multiseed.py
 
 
 clean:
