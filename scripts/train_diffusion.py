@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 import yaml
+from monai.inferers import sliding_window_inference
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -72,23 +73,7 @@ def train_one_epoch(refiner, baseline, loader, optimizer, schedule, device, scal
     return total / max(len(loader), 1)
 
 
-# @torch.no_grad()
-# def validate(refiner, baseline, loader, schedule, cfg, device):
-#     refiner.eval()
-#     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
-#     roi = tuple(cfg["data"]["patch_size"])
-#     from monai.inferers import sliding_window_inference
-#     for batch in tqdm(loader, desc="val", leave=False):
-#         image = batch["image"].to(device); label = batch["label"].to(device)
-#         initial_logits = sliding_window_inference(
-#             inputs=image, roi_size=roi,
-#             sw_batch_size=cfg["evaluation"]["sw_batch_size"],
-#             predictor=baseline, overlap=cfg["evaluation"]["overlap"])
-#         refined = schedule.sample(refiner=refiner, image=image,
-#             initial_logits=initial_logits,
-#             inference_steps=cfg["diffusion"]["inference_steps"])
-#         metrics.update(refined, label)
-#     return metrics.aggregate()
+
 
 
 @torch.no_grad()
@@ -96,7 +81,7 @@ def validate(refiner, baseline, loader, schedule, cfg, device):
     refiner.eval()
     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
     roi = tuple(cfg["data"]["patch_size"])
-    from monai.inferers import sliding_window_inference
+    
     
     # Determine the required divisor based on the number of downsampling layers.
     # A standard UNet has len(channels) - 1 downsampling steps.
