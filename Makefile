@@ -42,5 +42,16 @@ joint-e2e:
 	python scripts/train_joint.py --config configs/poc.yaml --mode end_to_end \
 		--baseline-ckpt outputs/e0_unet/best.pt --out outputs/joint_e2e
 
+multiseed:
+	bash scripts/run_multiseed.sh
+
+uncertainty:
+	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \
+		--baseline-ckpt outputs/e0_unet_seed0/best.pt \
+		--refiner-ckpt outputs/e2_diffusion_seed0/last.pt \
+		--out outputs/e2_diffusion_seed0_uncertainty
+
+
+
 clean:
 	rm -rf outputs checkpoints .pytest_cache .ruff_cache
