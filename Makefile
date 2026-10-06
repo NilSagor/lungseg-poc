@@ -45,11 +45,18 @@ joint-e2e:
 multiseed:
 	bash scripts/run_multiseed.sh
 
+# uncertainty:
+# 	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \
+# 		--baseline-ckpt outputs/e0_unet_seed0/best.pt \
+# 		--refiner-ckpt outputs/e2_diffusion_seed0/last.pt \
+# 		--out outputs/e2_diffusion_seed0_uncertainty
+
 uncertainty:
 	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \
-		--baseline-ckpt outputs/e0_unet_seed0/best.pt \
-		--refiner-ckpt outputs/e2_diffusion_seed0/last.pt \
-		--out outputs/e2_diffusion_seed0_uncertainty
+		--baseline-ckpt outputs/e0_unet_seed$(SEED0)/best.pt \
+		--refiner-ckpt outputs/e2_diffusion_seed$(SEED0)/last.pt \
+		--out outputs/e2_diffusion_seed$(SEED0)_uncertainty
+
 
 aggregate-multiseed:
 	python scripts/aggregate_multiseed.py
