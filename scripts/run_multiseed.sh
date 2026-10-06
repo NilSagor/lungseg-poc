@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Multi-seed runner: 5 seeds x E0-E3. Re-runnable: finished runs are skipped
-# (set FORCE=1 to redo). Assumes baselines write best.pt and refiners write last.pt.
+# Multi-seed runner: 5 seeds x E0-E3. Re-runnable: a run counts as finished only
+# when its metrics.json exists (set FORCE=1 to redo everything).
 set -euo pipefail
 
 CFG=${CFG:-configs/poc.yaml}
@@ -14,7 +14,7 @@ for SEED in "${SEEDS[@]}"; do
 
   for EXP in e0_unet e1_boundary; do
     OUT=outputs/${EXP}_seed${SEED}
-    if done_already "$OUT/best.pt"; then echo "skip $OUT"; continue; fi
+    if done_already "$OUT/metrics.json"; then echo "skip $OUT"; continue; fi
     EXTRA=()
     if [ "$EXP" = "e1_boundary" ]; then EXTRA+=(--use-boundary); fi
     python scripts/train_baseline.py --config "$CFG" --out "$OUT" \
@@ -22,14 +22,14 @@ for SEED in "${SEEDS[@]}"; do
   done
 
   OUT=outputs/e2_diffusion_seed${SEED}
-  if done_already "$OUT/last.pt"; then echo "skip $OUT"; else
+  if done_already "$OUT/metrics.json"; then echo "skip $OUT"; else
     python scripts/train_diffusion.py --config "$CFG" \
       --baseline-ckpt outputs/e0_unet_seed${SEED}/best.pt \
       --out "$OUT" --seed-override "$SEED"
   fi
 
   OUT=outputs/e3_diffusion_boundary_seed${SEED}
-  if done_already "$OUT/last.pt"; then echo "skip $OUT"; else
+  if done_already "$OUT/metrics.json"; then echo "skip $OUT"; else
     python scripts/train_diffusion.py --config "$CFG" \
       --baseline-ckpt outputs/e1_boundary_seed${SEED}/best.pt \
       --use-boundary --out "$OUT" --seed-override "$SEED"

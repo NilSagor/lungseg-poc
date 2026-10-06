@@ -14,9 +14,21 @@ METRICS = ("dice", "iou", "hd95")
 BASE = "e0_unet"
 
 
-def load_seed_metrics(root: Path, exp: str, seed: int):
+# def load_seed_metrics(root: Path, exp: str, seed: int):
+#     f = root / f"{exp}_seed{seed}" / "history.json"
+#     return json.loads(f.read_text()) if f.exists() else None
+
+
+def load_seed_metrics(root: Path, exp: str, seed: int) -> dict | None:
     f = root / f"{exp}_seed{seed}" / "metrics.json"
-    return json.loads(f.read_text()) if f.exists() else None
+    if not f.exists():
+        return None
+    try:
+        return json.loads(f.read_text())
+    except json.JSONDecodeError as e:
+        print(f"[warn] {f} is not valid JSON: {e}", file=sys.stderr)
+        return None
+
 
 
 def t_ci(x, alpha=0.05):
@@ -47,7 +59,13 @@ def main():
     p.add_argument("--seeds", nargs="+", type=int, default=[42, 123, 456, 789, 1010])
     p.add_argument("--out", default="outputs/multiseed_summary.csv")
     p.add_argument("--strict", action="store_true", help="fail if any run is missing")
+    p.add_argument("--baseline-exp", default="e0_unet",
+                       help="Reference experiment for paired comparisons")
     a = p.parse_args()
+    
+    
+    
+    
 
     root = Path(a.root)
     scal, cases = {}, {}   # [(exp, metric)] -> {seed: value / np.array}
@@ -75,12 +93,15 @@ def main():
                    "std": float(np.std(list(d.values()), ddof=1)) if len(d) > 1 else float("nan")}
             incomplete |= len(d) != len(a.seeds)
 
-            if exp != BASE:
-                base = scal.get((BASE, metric), {})
+            # if exp != BASE:
+            if exp != a.baseline_exp:
+                # base = scal.get((BASE, metric), {})
+                base = scal.get((a.baseline_exp, metric), {})
                 common = sorted(set(d) & set(base))
                 dm, dlo, dhi = t_ci([d[s] - base[s] for s in common])
                 row.update(delta_vs_e0=dm, delta_ci95_lo=dlo, delta_ci95_hi=dhi, n_pairs=len(common))
-                ce, cb = cases.get((exp, metric), {}), cases.get((BASE, metric), {})
+                # ce, cb = cases.get((exp, metric), {}), cases.get((BASE, metric), {})
+                ce, cb = cases.get((exp, metric), {}), cases.get((a.baseline_exp, metric), {})
                 cs = sorted(set(ce) & set(cb))
                 if cs and len({len(ce[s]) for s in cs} | {len(cb[s]) for s in cs}) == 1:
                     cm, clo, chi = paired_case_bootstrap(
