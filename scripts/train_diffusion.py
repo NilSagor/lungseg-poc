@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 import yaml
+from monai.inferers import sliding_window_inference
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -72,23 +73,7 @@ def train_one_epoch(refiner, baseline, loader, optimizer, schedule, device, scal
     return total / max(len(loader), 1)
 
 
-# @torch.no_grad()
-# def validate(refiner, baseline, loader, schedule, cfg, device):
-#     refiner.eval()
-#     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
-#     roi = tuple(cfg["data"]["patch_size"])
-#     from monai.inferers import sliding_window_inference
-#     for batch in tqdm(loader, desc="val", leave=False):
-#         image = batch["image"].to(device); label = batch["label"].to(device)
-#         initial_logits = sliding_window_inference(
-#             inputs=image, roi_size=roi,
-#             sw_batch_size=cfg["evaluation"]["sw_batch_size"],
-#             predictor=baseline, overlap=cfg["evaluation"]["overlap"])
-#         refined = schedule.sample(refiner=refiner, image=image,
-#             initial_logits=initial_logits,
-#             inference_steps=cfg["diffusion"]["inference_steps"])
-#         metrics.update(refined, label)
-#     return metrics.aggregate()
+
 
 
 @torch.no_grad()
@@ -96,7 +81,7 @@ def validate(refiner, baseline, loader, schedule, cfg, device):
     refiner.eval()
     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
     roi = tuple(cfg["data"]["patch_size"])
-    from monai.inferers import sliding_window_inference
+    
     
     # Determine the required divisor based on the number of downsampling layers.
     # A standard UNet has len(channels) - 1 downsampling steps.
@@ -138,9 +123,13 @@ def main():
     p.add_argument("--baseline-ckpt", required=True)
     p.add_argument("--use-boundary", action="store_true")
     p.add_argument("--out", default=None)
+    p.add_argument("--seed-override", type=int, default=42)
     a = p.parse_args()
 
     cfg = yaml.safe_load(Path(a.config).read_text())
+    if a.seed_override is not None:
+        cfg["seed"] = a.seed_override
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_loader, val_loader = build_dataloaders(cfg, cfg["data"]["split_file"])
     baseline = load_baseline(cfg, device, a.baseline_ckpt)
@@ -161,12 +150,14 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     writer = SummaryWriter(log_dir=str(out_dir / "tb"))
     history = []
-    for epoch in range(1, cfg["training"]["diffusion_epochs"] + 1):
+    n_ep = cfg["training"]["diffusion_epochs"]
+    for epoch in range(1, n_ep + 1):
         train_loss = train_one_epoch(refiner, baseline, train_loader, optimizer,
             schedule, device, scaler, cfg)
         writer.add_scalar("loss/train", train_loss, epoch)
         print(f"epoch {epoch:03d} | diff_loss={train_loss:.4f}")
-        if epoch % cfg["training"]["val_interval"] == 0:
+        if epoch % cfg["training"]["val_interval"] == 0 or epoch == n_ep:
+        # if epoch % cfg["training"]["val_interval"] == 0:
             val_metrics = validate(refiner, baseline, val_loader, schedule, cfg, device)
             for k, v in val_metrics.items():
                 writer.add_scalar(f"val/{k}", v, epoch)
@@ -174,6 +165,25 @@ def main():
             history.append({"epoch": epoch, "train_loss": train_loss, **val_metrics})
     torch.save(refiner.state_dict(), out_dir / "last.pt")
     (out_dir / "history.json").write_text(json.dumps(history, indent=2))
+    print(f"Saved to {out_dir}")
+
+    # ------------------------------------------------------------------
+    # Persist final validation metrics for multiseed aggregation.
+    # ------------------------------------------------------------------
+    # if history:
+    #     final_metrics = validate(refiner, baseline, val_loader, schedule, cfg, device)
+    #     final_metrics["epoch"] = history[-1]["epoch"]
+    #     final_metrics["seed"] = cfg["seed"]
+    #     final_metrics["use_boundary"] = bool(a.use_boundary)
+    #     final_metrics["sampler"] = cfg["evaluation"].get("diffusion_sampler", "full")
+    #     (out_dir / "metrics.json").write_text(json.dumps(final_metrics, indent=2))
+    #     print(f"Wrote {out_dir / 'metrics.json'}: {final_metrics}")
+
+    if history:
+        (out_dir / "metrics.json").write_text(json.dumps(
+            {**history[-1], "seed": cfg["seed"], "checkpoint": "last.pt",
+            "sampler": cfg["evaluation"].get("diffusion_sampler", "full")}, indent=2))
+    
     print(f"Saved to {out_dir}")
 
 

@@ -19,6 +19,7 @@ dependencies = [
     "tensorboard>=2.16",
     "matplotlib>=3.11.2",
     "seaborn>=0.13.2",
+    "tabulate>=0.10.0",
 ]
 
 [project.optional-dependencies]

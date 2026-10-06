@@ -39,7 +39,8 @@ def build_loss(cfg, use_boundary):
 
 
 def train_one_epoch(model, loader, optimizer, loss_fn, device, scaler, use_amp):
-    model.train(); running = 0.0
+    model.train()
+    running = 0.0
     for batch in tqdm(loader, desc="train", leave=False):
         image = batch["image"].to(device, non_blocking=True)
         label = batch["label"].to(device, non_blocking=True)
@@ -77,9 +78,12 @@ def main():
     p.add_argument("--max_epochs", type=int, default=None)
     p.add_argument("--use-boundary", action="store_true")
     p.add_argument("--out", default=None)
+    p.add_argument("--seed-override", type=int, default=42)
     a = p.parse_args()
 
     cfg = yaml.safe_load(Path(a.config).read_text())
+    if a.seed_override is not None:
+        cfg["seed"] = a.seed_override
     set_seed(cfg["seed"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -137,6 +141,29 @@ def main():
     torch.save(model.state_dict(), out_dir / "last.pt")
     (out_dir / "history.json").write_text(json.dumps(history, indent=2))
     print(f"Saved to {out_dir}")
+
+    # if not a.debug and history:
+    #     best_ckpt = out_dir / "best.pt"
+    #     if best_ckpt.exists():
+    #         model.load_state_dict(torch.load(best_ckpt, map_location=device))
+    #     final_metrics = validate(model, val_loader, cfg, device)
+    #     final_metrics["epoch"] = history[-1]["epoch"]
+    #     final_metrics["seed"] = cfg["seed"]
+    #     final_metrics["use_boundary"] = bool(a.use_boundary)
+    #     (out_dir / "metrics.json").write_text(json.dumps(final_metrics, indent=2))
+    #     print(f"Wrote {out_dir / 'metrics.json'}: {final_metrics}")
+    if not a.debug and history:
+        best = max(history, key=lambda r: r["dice"])      # same rule as best.pt
+        (out_dir / "metrics.json").write_text(json.dumps(
+            {**best, "seed": cfg["seed"], "use_boundary": bool(a.use_boundary),
+            "checkpoint": "best.pt"}, indent=2))
+   
+    print(f"Saved to {out_dir}")
+
+    # if not a.debug and history:
+    #     best = max(history, key=lambda r: r["dice"])          # same rule as best.pt
+    #     (out_dir / "metrics.json").write_text(json.dumps(
+    #         {**best, "seed": cfg["seed"], "use_boundary": bool(a.use_boundary)}, indent=2))
 
 
 if __name__ == "__main__":
