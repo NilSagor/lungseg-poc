@@ -1,5 +1,7 @@
 .PHONY: install lint test overfit baseline diffusion eval clean
 
+SEED0 ?= 42
+
 install:
 	pip install -e ".[dev]"
 
@@ -60,6 +62,10 @@ uncertainty:
 
 aggregate-multiseed:
 	python scripts/aggregate_multiseed.py
+
+calibration-figure:
+	python analysis/plot_calibration.py \
+		--summary outputs/e2_diffusion_seed$(SEED0)_uncertainty/summary.json
 
 
 clean:
