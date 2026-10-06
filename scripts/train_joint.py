@@ -110,6 +110,19 @@ def main():
     (out_dir / "history.json").write_text(json.dumps(history, indent=2))
     print(f"Saved to {out_dir}")
 
+    if history:
+        final_metrics = validate(
+            baseline, refiner, schedule, val_loader, cfg, device, use_patch
+        )
+        final_metrics["epoch"] = history[-1]["epoch"]
+        final_metrics["seed"] = cfg["seed"]
+        final_metrics["mode"] = a.mode
+        final_metrics["sampler"] = cfg["evaluation"].get("diffusion_sampler", "full")
+        (out_dir / "metrics.json").write_text(json.dumps(final_metrics, indent=2))
+        print(f"Wrote {out_dir / 'metrics.json'}: {final_metrics}")
+
+    print(f"Saved to {out_dir}")
+
 
 if __name__ == "__main__":
     main()
