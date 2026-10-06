@@ -1,5 +1,7 @@
 .PHONY: install lint test overfit baseline diffusion eval clean
 
+SEED0 ?= 42
+
 install:
 	pip install -e ".[dev]"
 
@@ -41,6 +43,30 @@ joint-alt:
 joint-e2e:
 	python scripts/train_joint.py --config configs/poc.yaml --mode end_to_end \
 		--baseline-ckpt outputs/e0_unet/best.pt --out outputs/joint_e2e
+
+multiseed:
+	bash scripts/run_multiseed.sh
+
+# uncertainty:
+# 	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \
+# 		--baseline-ckpt outputs/e0_unet_seed0/best.pt \
+# 		--refiner-ckpt outputs/e2_diffusion_seed0/last.pt \
+# 		--out outputs/e2_diffusion_seed0_uncertainty
+
+uncertainty:
+	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \
+		--baseline-ckpt outputs/e0_unet_seed$(SEED0)/best.pt \
+		--refiner-ckpt outputs/e2_diffusion_seed$(SEED0)/last.pt \
+		--out outputs/e2_diffusion_seed$(SEED0)_uncertainty
+
+
+aggregate-multiseed:
+	python scripts/aggregate_multiseed.py
+
+calibration-figure:
+	python analysis/plot_calibration.py \
+		--summary outputs/e2_diffusion_seed$(SEED0)_uncertainty/summary.json
+
 
 clean:
 	rm -rf outputs checkpoints .pytest_cache .ruff_cache
