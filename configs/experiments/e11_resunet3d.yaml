@@ -1,0 +1,3 @@
+base: configs/poc.yaml
+model:
+  name: resunet3d

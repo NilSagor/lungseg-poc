@@ -1,4 +1,4 @@
-"""Train the 3D U-Net baseline (E0 / E1)."""
+"""Train a 3D segmentation baseline."""
 import argparse
 import json
 import random
@@ -6,16 +6,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import yaml
 from monai.inferers import sliding_window_inference
 from monai.utils import set_determinism
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from lungseg.config import load_config
 from lungseg.data import build_dataloaders
-from lungseg.losses import BCEDiceLoss, BoundaryLoss
+from lungseg.losses import BCEDiceLoss, BoundaryLoss, deep_supervision_loss
 from lungseg.metrics import SegmentationMetrics
-from lungseg.models import BaselineUNet
+from lungseg.models import build_from_config
 
 
 def set_seed(seed):
@@ -30,6 +30,7 @@ def build_loss(cfg, use_boundary):
     seg = BCEDiceLoss()
     bnd = BoundaryLoss() if use_boundary else None
     w = cfg["training"]["boundary_weight"]
+
     def loss_fn(logits, target):
         loss = seg(logits, target)
         if bnd is not None:
@@ -38,21 +39,29 @@ def build_loss(cfg, use_boundary):
     return loss_fn
 
 
-def train_one_epoch(model, loader, optimizer, loss_fn, device, scaler, use_amp):
+def step(model, batch, optimizer, loss_fn, device, scaler=None, use_amp=False):
+    image = batch["image"].to(device, non_blocking=True)
+    label = batch["label"].to(device, non_blocking=True)
+    optimizer.zero_grad(set_to_none=True)
+    if use_amp:
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            loss = deep_supervision_loss(loss_fn, model(image), label)
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+    else:
+        loss = deep_supervision_loss(loss_fn, model(image), label)
+        loss.backward()
+        optimizer.step()
+    return loss.item()
+
+
+def train_one_epoch(model, loader, optimizer, loss_fn, device, scaler, use_amp, show_progress=True):
     model.train()
     running = 0.0
-    for batch in tqdm(loader, desc="train", leave=False):
-        image = batch["image"].to(device, non_blocking=True)
-        label = batch["label"].to(device, non_blocking=True)
-        optimizer.zero_grad(set_to_none=True)
-        if use_amp:
-            with torch.autocast(device_type="cuda", dtype=torch.float16):
-                logits = model(image); loss = loss_fn(logits, label)
-            scaler.scale(loss).backward(); scaler.step(optimizer); scaler.update()
-        else:
-            logits = model(image); loss = loss_fn(logits, label)
-            loss.backward(); optimizer.step()
-        running += loss.item()
+    it = tqdm(loader, desc="train", leave=False) if show_progress else loader
+    for batch in it:
+        running += step(model, batch, optimizer, loss_fn, device, scaler, use_amp)
     return running / max(len(loader), 1)
 
 
@@ -62,7 +71,8 @@ def validate(model, loader, cfg, device):
     metrics = SegmentationMetrics(threshold=cfg["evaluation"]["threshold"])
     roi = tuple(cfg["data"]["patch_size"])
     for batch in tqdm(loader, desc="val", leave=False):
-        image = batch["image"].to(device); label = batch["label"].to(device)
+        image = batch["image"].to(device)
+        label = batch["label"].to(device)
         logits = sliding_window_inference(
             inputs=image, roi_size=roi,
             sw_batch_size=cfg["evaluation"]["sw_batch_size"],
@@ -81,7 +91,7 @@ def main():
     p.add_argument("--seed-override", type=int, default=42)
     a = p.parse_args()
 
-    cfg = yaml.safe_load(Path(a.config).read_text())
+    cfg = load_config(a.config)
     if a.seed_override is not None:
         cfg["seed"] = a.seed_override
     set_seed(cfg["seed"])
@@ -94,14 +104,17 @@ def main():
         subset = []
         for i, batch in enumerate(train_loader):
             subset.append(batch)
-            if i >= 3: break
+            if i >= 3:
+                break
         train_loader = subset
 
-    model = BaselineUNet(
-        channels=tuple(cfg["model"]["channels"]),
-        num_res_units=cfg["model"]["num_res_units"]).to(device)
+    model = build_from_config(cfg).to(device)
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"Model: {cfg['model'].get('name', 'unet3d')} ({n_params / 1e6:.2f}M params)")
+
     loss_fn = build_loss(cfg, use_boundary=a.use_boundary)
-    optimizer = torch.optim.AdamW(model.parameters(),
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
         lr=cfg["training"]["learning_rate"],
         weight_decay=cfg["training"]["weight_decay"])
     scaler = torch.amp.GradScaler(
@@ -112,19 +125,17 @@ def main():
     writer = SummaryWriter(log_dir=str(out_dir / "tb"))
 
     epochs = a.max_epochs or cfg["training"]["baseline_epochs"]
-    best_dice = -1.0; history = []
+    best_dice = -1.0
+    history = []
     for epoch in range(1, epochs + 1):
         if a.debug:
-            model.train(); total = 0.0
-            for batch in train_loader:
-                image = batch["image"].to(device); label = batch["label"].to(device)
-                optimizer.zero_grad(set_to_none=True)
-                logits = model(image); loss = loss_fn(logits, label)
-                loss.backward(); optimizer.step(); total += loss.item()
-            train_loss = total / len(train_loader)
+            train_loss = train_one_epoch(
+                model, train_loader, optimizer, loss_fn, device, None, False,
+                show_progress=False)
         else:
-            train_loss = train_one_epoch(model, train_loader, optimizer, loss_fn,
-                device, scaler, cfg["training"]["amp"])
+            train_loss = train_one_epoch(
+                model, train_loader, optimizer, loss_fn, device, scaler,
+                cfg["training"]["amp"])
         writer.add_scalar("loss/train", train_loss, epoch)
         print(f"epoch {epoch:03d} | train_loss={train_loss:.4f}")
 
@@ -140,30 +151,18 @@ def main():
 
     torch.save(model.state_dict(), out_dir / "last.pt")
     (out_dir / "history.json").write_text(json.dumps(history, indent=2))
-    print(f"Saved to {out_dir}")
 
-    # if not a.debug and history:
-    #     best_ckpt = out_dir / "best.pt"
-    #     if best_ckpt.exists():
-    #         model.load_state_dict(torch.load(best_ckpt, map_location=device))
-    #     final_metrics = validate(model, val_loader, cfg, device)
-    #     final_metrics["epoch"] = history[-1]["epoch"]
-    #     final_metrics["seed"] = cfg["seed"]
-    #     final_metrics["use_boundary"] = bool(a.use_boundary)
-    #     (out_dir / "metrics.json").write_text(json.dumps(final_metrics, indent=2))
-    #     print(f"Wrote {out_dir / 'metrics.json'}: {final_metrics}")
     if not a.debug and history:
-        best = max(history, key=lambda r: r["dice"])      # same rule as best.pt
-        (out_dir / "metrics.json").write_text(json.dumps(
-            {**best, "seed": cfg["seed"], "use_boundary": bool(a.use_boundary),
-            "checkpoint": "best.pt"}, indent=2))
-   
+        best = max(history, key=lambda r: r["dice"])
+        (out_dir / "metrics.json").write_text(json.dumps({
+            **best,
+            "seed": cfg["seed"],
+            "use_boundary": bool(a.use_boundary),
+            "model": cfg["model"].get("name", "unet3d"),
+            "n_params": n_params,
+            "checkpoint": "best.pt",
+        }, indent=2))
     print(f"Saved to {out_dir}")
-
-    # if not a.debug and history:
-    #     best = max(history, key=lambda r: r["dice"])          # same rule as best.pt
-    #     (out_dir / "metrics.json").write_text(json.dumps(
-    #         {**best, "seed": cfg["seed"], "use_boundary": bool(a.use_boundary)}, indent=2))
 
 
 if __name__ == "__main__":
