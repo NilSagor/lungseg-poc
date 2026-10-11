@@ -1,0 +1,4 @@
+# Phase 12: nnU-Net-style DynUNet with deep supervision. Same as E0.
+base: configs/poc.yaml
+model:
+  name: nnunet_style

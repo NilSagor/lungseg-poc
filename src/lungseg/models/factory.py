@@ -38,6 +38,7 @@ def build_segmentation_model(
     if name == "nnunet_style":
         # Phase 12 will fill the implementation; the call site is fixed now.
         return NNUNetStyle(channels=channels, patch_size=tuple(patch_size))
+    
 
     if name == "transformer":
         variant = (variant or "swinunetr").lower()
