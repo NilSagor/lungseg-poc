@@ -2,7 +2,9 @@
 differences vs E0 (same seed = pair). If metrics.json contains a "per_case"
 list, also a paired bootstrap over cases (averaged over seeds)."""
 
-import argparse, json, sys
+import argparse
+import json
+import sys
 from pathlib import Path
 
 import numpy as np
