@@ -9,7 +9,7 @@ description = "Proof of concept: conditional diffusion refinement for lung tumor
 requires-python = ">=3.10"
 dependencies = [
     "torch>=2.2",
-    "monai>=1.3",
+    "monai>=1.6",
     "nibabel>=5.2",
     "numpy>=1.26",
     "scipy>=1.12",
@@ -20,6 +20,7 @@ dependencies = [
     "matplotlib>=3.11.2",
     "seaborn>=0.13.2",
     "tabulate>=0.10.0",
+    "einops>=0.7",
 ]
 
 [project.optional-dependencies]
