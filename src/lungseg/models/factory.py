@@ -11,11 +11,12 @@ SEGMENTATION_MODELS = (
     "unet3d",
     "resunet3d",
     "nnunet_style",
-    "transformer",
+    "swinunetr",
+    "unetr",
     "segresnet",
 )
 
-_TRANSFORMER_VARIANTS = ("swinunetr", "unetr")
+# _TRANSFORMER_VARIANTS = ("swinunetr", "unetr")
 
 
 def build_segmentation_model(
@@ -40,14 +41,24 @@ def build_segmentation_model(
         return NNUNetStyle(channels=channels, patch_size=tuple(patch_size))
     
 
-    if name == "transformer":
-        variant = (variant or "swinunetr").lower()
-        if variant == "swinunetr":
-            return SwinUNETRSeg(feature_size=feature_size or 24)
-        if variant == "unetr":
-            return UNETRSeg(img_size=tuple(patch_size), feature_size=feature_size or 16)
-        raise ValueError(f"Unknown transformer variant {variant!r}; choose from {_TRANSFORMER_VARIANTS}")
+    # if name == "transformer":
+    #     variant = (variant or "swinunetr").lower()
+    #     if variant == "swinunetr":
+    #         return SwinUNETRSeg(feature_size=feature_size or 24)
+    #     if variant == "unetr":
+    #         return UNETRSeg(img_size=tuple(patch_size), feature_size=feature_size or 16)
+    #     raise ValueError(f"Unknown transformer variant {variant!r}; choose from {_TRANSFORMER_VARIANTS}")
 
+    if name == "swinunetr":
+        return SwinUNETRSeg(feature_size=feature_size or 24)
+
+    if name == "unetr":
+        return UNETRSeg(
+            img_size=tuple(patch_size),
+            feature_size=feature_size or 16,
+        )
+    
+    
     if name == "segresnet":
         return SegResNetSeg(init_filters=channels[0])
 

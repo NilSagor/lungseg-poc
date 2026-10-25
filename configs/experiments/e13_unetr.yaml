@@ -1,0 +1,8 @@
+# UNETR. img_size is taken from data.patch_size, so the
+# sliding-window ROI always matches it.
+base: configs/poc.yaml
+model:
+  name: unetr
+  feature_size: 16
+evaluation:
+  sw_batch_size: 1

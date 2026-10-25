@@ -6,10 +6,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import yaml
 from monai.data import Dataset
 from monai.inferers import sliding_window_inference
 
+from lungseg.config import load_config
 from lungseg.data import build_val_transforms, load_split
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.evaluation import (
@@ -23,7 +23,7 @@ from lungseg.evaluation import (
     volume_confidence,
     voxel_variance,
 )
-from lungseg.models import BaselineUNet, DiffusionRefiner
+from lungseg.models import DiffusionRefiner, build_from_config
 
 
 def _add(acc, bins):
@@ -51,7 +51,7 @@ def main():
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
-    cfg = yaml.safe_load(Path(a.config).read_text())
+    cfg = load_config(a.config)
     K = a.K or cfg.get("uncertainty", {}).get("K", 8)
     n_bins = a.n_bins or cfg.get("uncertainty", {}).get("n_bins_ece", 15)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,10 +61,7 @@ def main():
     ds = Dataset(data=split["val"], transform=build_val_transforms(cfg))
     roi = tuple(cfg["data"]["patch_size"])
 
-    baseline = BaselineUNet(
-        channels=tuple(cfg["model"]["channels"]),
-        num_res_units=cfg["model"]["num_res_units"],
-    ).to(device)
+    baseline = build_from_config(cfg).to(device)
     baseline.load_state_dict(torch.load(a.baseline_ckpt, map_location=device))
     baseline.eval()
 

@@ -1,4 +1,4 @@
-.PHONY: install lint test overfit baseline diffusion eval clean
+.PHONY: install lint test overfit baseline diffusion eval experiments benchmark-sampling joint-warmup joint-alt joint-e2e multiseed baselines uncertainty aggregate-multiseed calibration-figure clean
 
 SEED0 ?= 42
 
@@ -46,6 +46,9 @@ joint-e2e:
 
 multiseed:
 	bash scripts/run_multiseed.sh
+
+baselines:
+	bash scripts/run_baselines.sh
 
 # uncertainty:
 # 	python scripts/evaluate_uncertainty.py --config configs/poc.yaml \

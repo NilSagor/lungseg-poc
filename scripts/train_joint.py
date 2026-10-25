@@ -4,16 +4,16 @@ import json
 from pathlib import Path
 
 import torch
-import yaml
 from monai.inferers import sliding_window_inference
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from lungseg.config import load_config
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.inference import patch_diffusion_sample
 from lungseg.metrics import SegmentationMetrics
-from lungseg.models import BaselineUNet, DiffusionRefiner
+from lungseg.models import DiffusionRefiner, build_from_config
 from lungseg.training.joint_trainer import JointTrainer
 
 
@@ -64,14 +64,11 @@ def main():
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
-    cfg = yaml.safe_load(Path(a.config).read_text())
+    cfg = load_config(a.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_loader, val_loader = build_dataloaders(cfg, cfg["data"]["split_file"])
-    baseline = BaselineUNet(
-        channels=tuple(cfg["model"]["channels"]),
-        num_res_units=cfg["model"]["num_res_units"],
-    ).to(device)
+    baseline = build_from_config(cfg).to(device)
     refiner = DiffusionRefiner(
         channels=tuple(cfg["model"]["channels"]),
         num_res_units=cfg["model"]["num_res_units"],
