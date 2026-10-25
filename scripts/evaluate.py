@@ -5,15 +5,15 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-import yaml
 from monai.inferers import sliding_window_inference
 from tqdm import tqdm
 
+from lungseg.config import load_config
 from lungseg.data import build_dataloaders
 from lungseg.diffusion import DiffusionSchedule
 from lungseg.inference import patch_diffusion_sample
 from lungseg.metrics import SegmentationMetrics
-from lungseg.models import BaselineUNet, DiffusionRefiner
+from lungseg.models import DiffusionRefiner, build_from_config
 
 
 def pad_to_multiple(tensor: torch.Tensor, multiple: int = 16) -> torch.Tensor:
@@ -47,12 +47,11 @@ def main():
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
-    cfg = yaml.safe_load(Path(a.config).read_text())
+    cfg = load_config(a.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, val_loader = build_dataloaders(cfg, cfg["data"]["split_file"])
 
-    baseline = BaselineUNet(channels=tuple(cfg["model"]["channels"]),
-        num_res_units=cfg["model"]["num_res_units"]).to(device)
+    baseline = build_from_config(cfg).to(device)
     baseline.load_state_dict(torch.load(a.baseline_ckpt, map_location=device))
     baseline.eval()
 
@@ -99,16 +98,12 @@ def main():
                 )
             else:
                 refined_logits = schedule.sample(
-                                refiner=refiner, 
-                                image=padded_image,
-                                initial_logits=padded_logits,
-                                inference_steps=cfg["diffusion"]["inference_steps"]
-                            )
-
-            
-            
-            
-            logits = crop_to_original(refined_logits, image.shape)
+                    refiner=refiner,
+                    image=padded_image,
+                    initial_logits=padded_logits,
+                    inference_steps=cfg["diffusion"]["inference_steps"],
+                )
+                logits = crop_to_original(refined_logits, image.shape)
             # logits = schedule.sample(refiner=refiner, image=image,
             #     initial_logits=logits,
             #     inference_steps=cfg["diffusion"]["inference_steps"])

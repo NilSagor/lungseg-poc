@@ -1,0 +1,8 @@
+# SwinUNETR. Patch size must be a multiple of 32 (96 is fine).
+# sw_batch_size 1 only saves GPU memory; it does not change predictions.
+base: configs/poc.yaml
+model:
+  name: swinunetr
+  feature_size: 24      # multiple of 12; halve to 12 if you hit OOM
+evaluation:
+  sw_batch_size: 1
